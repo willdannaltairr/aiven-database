@@ -2,15 +2,18 @@
 
 import { useEffect, useState } from 'react';
 
-const emptyForm = { name: '', description: '', price: '' };
+const emptyForm = { name: '', description: '', price: '', category_id: '' };
 
 export default function Home() {
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [newCategory, setNewCategory] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
 
   async function loadProducts() {
     setLoading(true);
@@ -27,8 +30,19 @@ export default function Home() {
     }
   }
 
+  async function loadCategories() {
+    try {
+      const res = await fetch('/api/categories');
+      const data = await res.json();
+      if (res.ok) setCategories(data);
+    } catch (err) {
+      // ignore
+    }
+  }
+
   useEffect(() => {
     loadProducts();
+    loadCategories();
   }, []);
 
   function handleChange(e) {
@@ -42,6 +56,7 @@ export default function Home() {
       name: product.name,
       description: product.description || '',
       price: product.price,
+      category_id: product.category_id ? String(product.category_id) : '',
     });
   }
 
@@ -58,10 +73,15 @@ export default function Home() {
       const url = editingId ? `/api/products/${editingId}` : '/api/products';
       const method = editingId ? 'PUT' : 'POST';
 
+      const payload = {
+        ...form,
+        category_id: form.category_id ? Number(form.category_id) : null,
+      };
+
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -84,6 +104,44 @@ export default function Home() {
       const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Gagal menghapus data');
+      await loadProducts();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleAddCategory(e) {
+    e.preventDefault();
+    if (!newCategory.trim()) return;
+    setError('');
+    try {
+      const res = await fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newCategory.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Gagal menambah kategori');
+      setNewCategory('');
+      await loadCategories();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  // Produk yang ditampilkan: semua, atau hanya milik kategori yang dipilih.
+  const visibleProducts = filterCategory
+    ? products.filter((p) => String(p.category_id) === filterCategory)
+    : products;
+
+  async function handleDeleteCategory(id) {
+    if (!confirm('Yakin ingin menghapus kategori ini?')) return;
+    setError('');
+    try {
+      const res = await fetch(`/api/categories/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Gagal menghapus kategori');
+      await loadCategories();
       await loadProducts();
     } catch (err) {
       setError(err.message);
@@ -139,6 +197,23 @@ export default function Home() {
             />
           </div>
 
+          <div className="form-row">
+            <label htmlFor="category_id">Kategori</label>
+            <select
+              id="category_id"
+              name="category_id"
+              value={form.category_id}
+              onChange={handleChange}
+            >
+              <option value="">-- Tanpa Kategori --</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="form-actions">
             <button type="submit" className="btn-primary" disabled={saving}>
               {saving ? 'Menyimpan...' : editingId ? 'Update' : 'Simpan'}
@@ -152,40 +227,92 @@ export default function Home() {
         </form>
       </div>
 
-      <div className="status">
-        {loading ? 'Memuat data...' : `${products.length} produk ditemukan`}
+      <div className="card">
+        <h3>Kelola Kategori</h3>
+        <form onSubmit={handleAddCategory} className="form-row-inline">
+          <input
+            value={newCategory}
+            onChange={(e) => setNewCategory(e.target.value)}
+            placeholder="Nama kategori baru"
+          />
+          <button type="submit" className="btn-primary">
+            Tambah
+          </button>
+        </form>
+        <ul className="category-list">
+          {categories.map((c) => (
+            <li key={c.id}>
+              {c.name}
+              <button
+                className="btn-danger btn-sm"
+                onClick={() => handleDeleteCategory(c.id)}
+              >
+                Hapus
+              </button>
+            </li>
+          ))}
+        </ul>
       </div>
 
-      <table>
-        <thead>
-          <tr>
-            <th>Nama</th>
-            <th>Deskripsi</th>
-            <th>Harga</th>
-            <th>Aksi</th>
-          </tr>
-        </thead>
-        <tbody>
-          {products.map((p) => (
-            <tr key={p.id}>
-              <td>{p.name}</td>
-              <td>{p.description}</td>
-              <td>Rp {Number(p.price).toLocaleString('id-ID')}</td>
-              <td>
-                <button className="btn-edit" onClick={() => startEdit(p)}>
-                  Edit
-                </button>
-                <button className="btn-danger" onClick={() => handleDelete(p.id)}>
-                  Hapus
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="list-toolbar">
+        <div className="status">
+          {loading ? 'Memuat data...' : `${visibleProducts.length} produk ditemukan`}
+        </div>
+        <div className="filter-row">
+          <label htmlFor="filter-category">Pilih kategori</label>
+          <select
+            id="filter-category"
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+          >
+            <option value="">Semua kategori</option>
+            {categories.map((c) => (
+              <option key={c.id} value={String(c.id)}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
 
-      {!loading && products.length === 0 && (
-        <div className="empty">Belum ada produk. Tambahkan produk pertama di atas.</div>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Nama</th>
+              <th>Deskripsi</th>
+              <th>Harga</th>
+              <th>Kategori</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visibleProducts.map((p) => (
+              <tr key={p.id}>
+                <td>{p.name}</td>
+                <td>{p.description}</td>
+                <td>Rp {Number(p.price).toLocaleString('id-ID')}</td>
+                <td>{p.category_name || '-'}</td>
+                <td>
+                  <button className="btn-edit" onClick={() => startEdit(p)}>
+                    Edit
+                  </button>
+                  <button className="btn-danger" onClick={() => handleDelete(p.id)}>
+                    Hapus
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {!loading && visibleProducts.length === 0 && (
+        <div className="empty">
+          {products.length === 0
+            ? 'Belum ada produk. Tambahkan produk pertama di atas.'
+            : 'Tidak ada produk pada kategori ini.'}
+        </div>
       )}
     </main>
   );

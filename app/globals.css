@@ -48,12 +48,48 @@ h1 {
 }
 
 .form-row input,
+.form-row select,
 .form-row textarea {
   padding: 8px 10px;
   border: 1px solid #ccc;
   border-radius: 6px;
   font-size: 14px;
   font-family: inherit;
+}
+
+.form-row-inline {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.form-row-inline input {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.category-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.category-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid #eee;
+  font-size: 14px;
+}
+
+.btn-sm {
+  padding: 2px 8px;
+  font-size: 12px;
 }
 
 .form-actions {
@@ -120,11 +156,20 @@ table {
   background: #fff;
 }
 
+/* Tabel 5 kolom lebih lebar dari layar HP, jadi scroll-nya
+   dibatasi di wadah ini supaya halaman tidak ikut melebar. */
+.table-wrap {
+  overflow-x: auto;
+  background: #fff;
+  border-radius: 8px;
+}
+
 th, td {
   text-align: left;
   padding: 10px 12px;
   border-bottom: 1px solid #eee;
   font-size: 14px;
+  white-space: nowrap;
 }
 
 th {
@@ -155,3 +200,47 @@ th {
   color: #666;
   margin-bottom: 16px;
 }
+
+.list-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.list-toolbar .status {
+  margin-bottom: 0;
+}
+
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-row label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.filter-row select {
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fff;
+}
+
+@media (max-width: 480px) {
+  .list-toolbar {
+    align-items: flex-start;
+  }
+
+  .filter-row {
+    flex-wrap: wrap;
+  }
+}
+
