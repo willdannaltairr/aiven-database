@@ -3,3 +3,7 @@ node_modules
 .env.local
 .env
 npm-debug.log*
+
+# log dev lokal
+dev_out.txt
+dev_err.txt
