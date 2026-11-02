@@ -10,12 +10,20 @@ dengan database di Aiven.
 app/
   api/products/route.js         -> GET (list), POST (create)
   api/products/[id]/route.js    -> GET (detail), PUT (update), DELETE
-  page.js                       -> Halaman utama (tabel + form)
+  api/categories/route.js       -> GET (list), POST (create)
+  api/categories/[id]/route.js  -> PUT (update), DELETE
+  page.js                       -> Halaman utama (tabel + form + filter kategori)
   layout.js
   globals.css
 lib/
   db.js                         -> Koneksi pool MySQL (support SSL Aiven)
-schema.sql                      -> Skema tabel `products`
+migrations/
+  001_create_categories.sql     -> Tabel `categories`
+  002_create_products.sql       -> Tabel `products` (relasi ke categories)
+  003_add_category_to_products.sql -> Kolom + FK category_id untuk tabel lama
+scripts/
+  migrate.mjs                   -> Runner migration (npm run db:migrate)
+schema.sql                      -> Skema lengkap (referensi; setup pakai migration)
 .env.local.example              -> Contoh environment variables
 ```
 
@@ -25,11 +33,7 @@ schema.sql                      -> Skema tabel `products`
 2. Pilih region terdekat, tunggu status menjadi "Running".
 3. Buka tab **Overview**, catat: `Host`, `Port`, `User` (biasanya `avnadmin`), `Password`, `Database name` (default `defaultdb`).
 4. Download **CA Certificate** (`ca.pem`) dari halaman yang sama.
-5. Buat tabelnya. Bisa lewat Aiven Console (query editor) atau CLI MySQL:
-   ```bash
-   mysql --host=<HOST> --port=<PORT> --user=<USER> --password=<PASSWORD> \
-     --database=<DBNAME> --ssl-mode=REQUIRED < schema.sql
-   ```
+5. Jalankan migration untuk membuat tabelnya (lihat bagian **Migration Database** di bawah).
 
 ## 2. Setup Project Secara Lokal
 
@@ -63,9 +67,54 @@ Jalankan secara lokal:
 npm run dev
 ```
 
-Buka http://localhost:3000 — kamu akan melihat form tambah produk dan tabel daftar produk.
+Buka http://localhost:3000 — kamu akan melihat form tambah produk, tabel daftar produk, dan filter kategori.
 
-## 3. Push ke GitHub
+## 3. Migration Database
+
+Skema database dikelola lewat file SQL di folder `migrations/`. Setiap file yang sudah
+pernah dijalankan dicatat di tabel `schema_migrations`, jadi migration aman dijalankan berulang.
+
+Pastikan `.env.local` sudah terisi (langkah 2 di atas) — script membaca file itu otomatis.
+
+```bash
+npm run db:migrate
+```
+
+Hasilnya:
+
+```text
+applied  001_create_categories.sql
+applied  002_create_products.sql
+applied  003_add_category_to_products.sql
+Migration selesai.
+```
+
+Kalau dijalankan lagi, file yang sudah pernah jalan akan dilewati:
+
+```text
+skip     001_create_categories.sql
+skip     002_create_products.sql
+skip     003_add_category_to_products.sql
+Migration selesai.
+```
+
+Menambah tabel/kolom baru: buat file baru di `migrations/` dengan nomor urut berikutnya
+(misal `004_tambah_stok.sql`), lalu jalankan `npm run db:migrate` lagi. Jangan mengubah
+file migration yang sudah pernah dijalankan — buat file baru.
+
+Kalau ada file yang gagal, script berhenti dengan exit code 1 dan nama file yang bermasalah:
+
+```text
+applied  001_create_categories.sql
+applied  002_create_products.sql
+applied  003_add_category_to_products.sql
+gagal    004_tambah_stok.sql
+Duplicate column name 'jumlah'
+```
+
+File yang gagal tidak dicatat di `schema_migrations`, jadi bisa diperbaiki lalu dijalankan ulang.
+
+## 4. Push ke GitHub
 
 ```bash
 git init
@@ -78,7 +127,7 @@ git push -u origin main
 
 Pastikan `.env.local` **tidak** ikut ter-commit (sudah otomatis diabaikan lewat `.gitignore`).
 
-## 4. Deploy ke Vercel
+## 5. Deploy ke Vercel
 
 1. Login ke https://vercel.com dengan akun GitHub.
 2. Klik **Add New → Project**, pilih repo yang baru saja di-push.
@@ -92,15 +141,28 @@ Pastikan `.env.local` **tidak** ikut ter-commit (sudah otomatis diabaikan lewat 
 4. Klik **Deploy**.
 5. Setelah selesai, buka URL yang diberikan Vercel (`https://nama-project.vercel.app`) — aplikasi CRUD sudah bisa dipakai.
 
+**Migration tidak jalan otomatis saat deploy.** Vercel hanya menjalankan `next build`, bukan
+`db:migrate`. Jalankan sekali dari komputermu, dengan `.env.local` yang menunjuk ke database
+production:
+
+```bash
+npm run db:migrate
+```
+
+Kalau database production-nya beda dengan yang lokal, isi `.env.local` dengan kredensial
+production dulu, jalankan migration, lalu kembalikan ke kredensial lokal. Cara lain: set
+variabel `DB_*` langsung di terminal sebelum menjalankan script.
+
 ## Fitur
 
-- **Create**: tambah produk baru lewat form (nama, deskripsi, harga)
+- **Create**: tambah produk baru lewat form (nama, deskripsi, harga, kategori)
 - **Read**: daftar semua produk otomatis dimuat saat halaman dibuka
 - **Update**: klik "Edit" pada baris produk untuk mengubah data
 - **Delete**: klik "Hapus" untuk menghapus produk (dengan konfirmasi)
+- **Kategori**: tambah/hapus kategori, pilih kategori saat menyimpan produk, dan filter tabel berdasarkan kategori
 
 ## Catatan
 
 - Free tier Aiven MySQL bisa nonaktif otomatis setelah periode idle tertentu — kamu akan mendapat notifikasi email sebelum itu terjadi.
-- Kalau ingin menambah kolom atau tabel baru, cukup ubah `schema.sql` dan sesuaikan query di `app/api/products/`.
+- Untuk mengubah skema database, tambahkan file baru di `migrations/` lalu jalankan `npm run db:migrate`.
 - Untuk validasi input yang lebih ketat atau autentikasi (login admin), beri tahu saya — bisa ditambahkan.
